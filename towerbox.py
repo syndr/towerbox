@@ -115,6 +115,19 @@ class Device(object):
         return status
 
     @property
+    def tags(self):
+        """The tags associated to this object
+
+        Returns:
+            list
+        """
+        if self._ns['tags'] is None:
+            tags = []
+        else:
+            tags = [slug_dict['slug'] for slug_dict in self._ns['tags']]
+        return tags
+
+    @property
     def hostvars(self):
         """The Host Vars associated with this object.
 
@@ -223,6 +236,19 @@ class VirtualMachine(object):
         return status
 
     @property
+    def tags(self):
+        """The tags associated to this object
+
+        Returns:
+            list
+        """
+        if self._ns['tags'] is None:
+            tags = []
+        else:
+            tags = [slug_dict['slug'] for slug_dict in self._ns['tags']]
+        return tags
+
+    @property
     def hostvars(self):
         """The Host Vars associated with this object.
 
@@ -328,14 +354,22 @@ class NetBoxInventory(object):
         _meta_ns = defaultdict(dict)
         for entity in self.entities:
             if entity.status == "active" and not entity.ip_address == "undefined":
-                for grouping in self.groupings:
+                base_group_names = []
+                for base_group in self.groupings:
                     try:
-                        device_group = entity[grouping]['slug']
-                        ns[device_group]['hosts'] += [entity.name]
-                        _meta_ns['hostvars'].update(entity.hostvars)
+                        base_group_names.append(entity[base_group]['slug'])
                     except TypeError:
                         # Skip items that aren't accessible (group likely doesn't exist for this entity)
                         pass
+                # Create groups for each tag
+                if entity.tags:
+                    ansible_groups = base_group_names + entity.tags
+                else:
+                    ansible_groups = base_group_names
+
+                for grouping in ansible_groups:
+                    ns[grouping]['hosts'] += [entity.name]
+                    _meta_ns['hostvars'].update(entity.hostvars)
         ns.update({'_meta': _meta_ns})
         return ns
 
